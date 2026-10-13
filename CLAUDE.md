@@ -39,4 +39,9 @@
 - Open questions are listed in ROADMAP.md and SCHEDULER_SPEC.md. Don't decide them silently; raise them with me when their phase starts.
 
 ## Commands
-(fill in as created)
+Run from the repo root.
+- Setup: `cp .env.example .env`, then change `POSTGRES_PASSWORD`.
+- Database up: `docker compose --env-file .env -f infra/docker-compose.yml up -d`
+- Database down: `docker compose -f infra/docker-compose.yml down` (data stays in `infra/pgdata/`)
+- Python tests (same as CI): `uv run --python 3.12 --with pytest pytest apps/api/tests`
+- iOS, worker, dashboard, evals: not created yet.
