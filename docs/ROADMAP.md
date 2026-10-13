@@ -2,7 +2,7 @@
 
 Backend and AI come first, for interview stories. The iOS spike is done early to de-risk.
 
-**Current phase: 0**
+**Current phase: 1**
 
 ## Phase 0
 - Public GitHub repo from day 1, with a README that states the goal.
