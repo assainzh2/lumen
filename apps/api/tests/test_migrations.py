@@ -14,9 +14,10 @@ API_DIR = Path(__file__).resolve().parents[1]
 def test_db_url() -> str:
     """URL of the throwaway database. Refuses to touch anything not named *_test."""
     url = os.environ.get("TEST_DATABASE_URL")
-    if url is None:
+    database = sa.engine.make_url(url).database if url else None
+    if not url:
         pytest.fail("TEST_DATABASE_URL is not set (see .env.example)")
-    if not sa.engine.make_url(url).database.endswith("_test"):
+    if database is None or not database.endswith("_test"):
         pytest.fail("TEST_DATABASE_URL must point at a database whose name ends in _test")
     return url
 
