@@ -8,8 +8,25 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: lumen
+          POSTGRES_PASSWORD: ci-only-password # throwaway container, not a real secret
+          POSTGRES_DB: lumen_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lumen -d lumen_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - name: Run placeholder tests
-        run: uv run --python 3.12 --with pytest pytest apps/api/tests
+      - name: Run API tests
+        working-directory: apps/api
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://lumen:ci-only-password@localhost:5432/lumen_test
+        run: uv run --python 3.12 pytest

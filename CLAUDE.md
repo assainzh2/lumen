@@ -49,5 +49,5 @@ Run from the repo root.
 - Setup: `cp .env.example .env`, then change `POSTGRES_PASSWORD`.
 - Database up: `docker compose --env-file .env -f infra/docker-compose.yml up -d`
 - Database down: `docker compose -f infra/docker-compose.yml down` (data stays in `infra/pgdata/`)
-- Python tests (same as CI): `uv run --python 3.12 --with pytest pytest apps/api/tests`
+- Python tests (same as CI; needs the database up and `TEST_DATABASE_URL` from `.env` exported): `set -a; source .env; set +a; cd apps/api && uv run --python 3.12 pytest`
 - iOS, worker, dashboard, evals: not created yet.
