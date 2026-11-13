@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import sqlalchemy as sa
 import psycopg
+from sqlalchemy.exc import IntegrityError
 
 # apps/api, where alembic.ini lives. Alembic must run from there.
 API_DIR = Path(__file__).resolve().parents[1]
@@ -80,7 +81,7 @@ def test_items_foreign_keys(test_db_url: str) -> None:
             )
 
         # (A) An item pointing at a source that does not exist is refused.
-        with pytest.raises(sa.exc.IntegrityError) as excinfo:
+        with pytest.raises(IntegrityError) as excinfo:
             with engine.begin() as conn:
                 conn.execute(
                     sa.text(
@@ -92,7 +93,7 @@ def test_items_foreign_keys(test_db_url: str) -> None:
         assert isinstance(excinfo.value.orig, psycopg.errors.ForeignKeyViolation)
 
         # (A2) same, but with a kind_id that does not exist.
-        with pytest.raises(sa.exc.IntegrityError) as excinfo:
+        with pytest.raises(IntegrityError) as excinfo:
             with engine.begin() as conn:
                 conn.execute(
                     sa.text(
@@ -103,7 +104,7 @@ def test_items_foreign_keys(test_db_url: str) -> None:
                 )
         assert isinstance(excinfo.value.orig, psycopg.errors.ForeignKeyViolation)
         # (C) deleting the source that the valid item uses is refused.
-        with pytest.raises(sa.exc.IntegrityError) as excinfo:
+        with pytest.raises(IntegrityError) as excinfo:
             with engine.begin() as conn:
                 conn.execute(
                     sa.text(
