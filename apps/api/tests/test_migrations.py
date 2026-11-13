@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 import sqlalchemy as sa
+import psycopg
 
 # apps/api, where alembic.ini lives. Alembic must run from there.
 API_DIR = Path(__file__).resolve().parents[1]
@@ -51,3 +52,67 @@ def test_sources_and_kinds_upgrade_and_downgrade(test_db_url: str) -> None:
     alembic(test_db_url, "downgrade", "base")
     assert not table_exists(test_db_url, "sources")
     assert not table_exists(test_db_url, "kinds")
+
+def test_items_foreign_keys(test_db_url: str) -> None:
+    alembic(test_db_url, "downgrade", "base")
+    alembic(test_db_url, "upgrade", "head")
+    engine = sa.create_engine(test_db_url)
+    try:
+        # Parent rows: an item needs a real source and a real kind to point at.
+        with engine.begin() as conn:
+            source_id = conn.execute(sa.text(
+                "INSERT INTO sources (url, text, licence) "
+                "VALUES ('https://example.com/a', 'Slow breathing lowers stress.', 'CC BY-SA') "
+                "RETURNING id"
+            )).scalar_one()
+            kind_id = conn.execute(sa.text(
+                "INSERT INTO kinds (name) VALUES ('fact') RETURNING id"
+            )).scalar_one()
+
+        # (OK) insert a valid item using source_id and kind_id.
+        with engine.begin() as conn:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO items (kind_id, source_id, card_text, quote) "
+                    "VALUES (:kind_id, :source_id, 'x', 'y')"
+                ),
+                {"kind_id": kind_id, "source_id": source_id},
+            )
+
+        # (A) An item pointing at a source that does not exist is refused.
+        with pytest.raises(sa.exc.IntegrityError) as excinfo:
+            with engine.begin() as conn:
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO items (kind_id, source_id, card_text, quote) "
+                        "VALUES (:kind_id, 999999, 'x', 'y')"
+                    ),
+                    {"kind_id": kind_id},
+                )
+        assert isinstance(excinfo.value.orig, psycopg.errors.ForeignKeyViolation)
+
+        # (A2) same, but with a kind_id that does not exist.
+        with pytest.raises(sa.exc.IntegrityError) as excinfo:
+            with engine.begin() as conn:
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO items (kind_id, source_id, card_text, quote) "
+                        "VALUES (999999, :source_id, 'x', 'y')"
+                    ),
+                    {"source_id": source_id},
+                )
+        assert isinstance(excinfo.value.orig, psycopg.errors.ForeignKeyViolation)
+        # (C) deleting the source that the valid item uses is refused.
+        with pytest.raises(sa.exc.IntegrityError) as excinfo:
+            with engine.begin() as conn:
+                conn.execute(
+                    sa.text(
+                        "DELETE FROM sources WHERE id = :source_id"
+                    ),
+                    {"source_id": source_id},
+                )
+        assert isinstance(excinfo.value.orig, psycopg.errors.ForeignKeyViolation)
+    finally:
+        engine.dispose()
+    # downgrade back to base so the next test starts clean.
+    alembic(test_db_url, "downgrade", "base")
