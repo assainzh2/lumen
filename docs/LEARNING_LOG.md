@@ -105,3 +105,16 @@ After each task: concepts I met, and 1-2 interview Q&As that I write myself.
   A: It guarantees that no two chunks of the same source have the same position, while different sources can each have a chunk 0. `UNIQUE (position)` would allow only one chunk 0 in the whole table, so the second source could never be chunked. A single-source test cannot tell them apart, so I added a test with two sources.
 - Q: How do you check that a migration test would catch a wrong migration?
   A: I ask which wrong implementations would still pass and write a test for each one. Examples here: a unique rule on the wrong column, and a missing `NOT NULL`. I also run the test before the migration exists and check that it fails for the right reason (`relation "chunks" does not exist`), not because of a typo in the test.
+
+## Phase 1: items.chunk_id migration
+
+### Concepts
+- **`ALTER TABLE`:** changes a table that already exists (`CREATE TABLE` builds a new one). `downgrade()` must undo it in reverse order.
+- **Composite foreign key:** a plain FK on `chunk_id` only checks that the chunk exists, so an item could say source 9 and cite a chunk of source 5. `FOREIGN KEY (chunk_id, source_id) REFERENCES chunks (id, source_id)` makes the database check the pair. It needs an explicit, *named* `UNIQUE (id, source_id)` on `chunks` first, and the name is what `downgrade()` drops.
+- **`NOT NULL` on a new column:** fails on a table that already has rows, because old rows have no value. It was safe here because no real items exist and every test starts from an empty database.
+- **Reading errors:** `DID NOT RAISE` means the database accepted a row it should have refused, so the migration is too weak. When pytest only shows `CalledProcessError`, run the alembic command by hand to see the real SQL error (`LINE 1` plus a `^` under the bad word).
+- **Test traps:** keep setup out of `pytest.raises`; use `with engine.begin()`, never a bare `engine.connect()` (it never commits and holds locks). A failed test can leave the test database at a half-applied version; reset `lumen_test` with `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`.
+
+### Interview Q&A (drafted by Claude, reviewed by me)
+- Q: Why did `items` need a composite foreign key instead of a plain one on `chunk_id`?
+  A: Because `items` stores both `source_id` and `chunk_id`, and a plain key would accept a chunk that belongs to a different source, which breaks "every item carries a real source". The pair key makes that contradiction impossible in the database itself, and a test with two sources proves it.
