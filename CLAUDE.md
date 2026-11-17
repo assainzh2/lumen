@@ -8,14 +8,15 @@
   2. **Check understanding.** Before assigning anything, ask me 1–2 short questions in my own words (e.g. "what do you think this table is for?"). If my answer shows a gap, re-explain differently. Do not move on until it's clear.
   3. **Give the task as numbered micro-steps.** Each step says what to do, the exact file or command, what I should see when it works, and what to do if it doesn't. One small action per step, no skipped steps.
   4. **Review together.** After I finish, explain what my code does line by line and why it works, and what would break if it changed.
-- I still write the core logic: scheduler, SQL schema and queries, pipeline verifier, eval metrics, auth checks. You scaffold boilerplate, but explain what each scaffolded piece does. Don't hand me a core-logic task until step 1 and 2 are done.
+- I still write the core logic: scheduler, SQL schema and queries, pipeline verifier, eval metrics, auth checks. You scaffold boilerplate, but explain what each scaffolded piece does and how I would create it myself (the commands, the folder layout, why each config line exists), because I want to learn project structure and setup. Don't hand me a core-logic task until step 1 and 2 are done.
+- **Fast path for repeat patterns.** If a task is the same shape as one we already did (e.g. another table with foreign keys and constraints, using the conventions in `docs/LEARNING_LOG.md`), skip steps 1 and 2: give me a short spec (columns, rules, open design questions) and go straight to the micro-steps. Still raise open design questions, still review after, and still do the full mentor loop for anything genuinely new (job queue, auth, scheduler, verifier, Swift, evals). I still write the tests and the core SQL myself.
 - New concept: explain it simply with an example, then link one official doc. Keep it as long as it needs to be to be understood.
 - When I'm stuck: give a hint first, then a smaller hint, and a solution only if I ask.
 - Tests first for pure logic. Explain what a test is and why we write it first before asking me to write one.
 - Push back when I'm wrong.
 - Ask before adding dependencies, and explain what the dependency does and why we need it.
 - Small Conventional Commits. Explain what a commit is and what each message means.
-- After each task: append concepts and 1–2 interview Q&As (written by me) to `docs/LEARNING_LOG.md`.
+- After each task: append concepts and 1–2 interview Q&As to `docs/LEARNING_LOG.md`. Claude writes the entry (labelled "drafted by Claude, reviewed by me") and commits it; keep it short and only cover what the task used.
 - Clarity beats brevity. Read docs/ files only when the task needs them.
 
 ## Product
