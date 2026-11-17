@@ -34,6 +34,7 @@ Backend and AI come first, for interview stories. The iOS spike is done early to
 - Open questions (decide at the start of Phase 2):
   - Content sources: which ones (e.g. Wikipedia is CC BY-SA, Project Gutenberg is public domain) and their attribution rules.
   - LLM provider and monthly budget cap.
+  - Embedding model and vector dimension (the `chunks` and dedupe columns need a fixed size), chosen together with the LLM provider.
   - Ed25519 signing key: where the private key lives, the public key embedded in the app, and a rotation plan.
 
 ## Phase 3
