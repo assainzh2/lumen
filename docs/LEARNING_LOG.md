@@ -126,8 +126,6 @@ After each task: concepts I met, and 1-2 interview Q&As that I write myself.
 - **Password hash:** a one-way scramble of the password. We store only the hash, so a leaked database does not contain real passwords. The hashing itself comes with the auth code in the API (full mentor loop then).
 - **Unique index on an expression:** `CREATE UNIQUE INDEX ... ON admin_users (lower(email))` compares the lowercased value, so `A@x.com` and `a@x.com` collide, while the stored `email` keeps its original casing. A plain `UNIQUE (email)` would be redundant next to it (everything it rejects, the index rejects too) and would double the index work on every write. [Docs](https://www.postgresql.org/docs/current/indexes-expressional.html)
 - **`DEFAULT` is not `NOT NULL`:** `DEFAULT now()` only fills the value when the column is left out; an explicit `NULL` is still accepted unless `NOT NULL` is there. Only a test that inserts `NULL` explicitly can see the difference.
-- **Test must fail for the right reason:** `(NULL, NULL)` for `(email, password_hash)` raises `NotNullViolation` from `email` alone, so it passed even without `NOT NULL` on `password_hash`. Keep every other column valid so only the column under test can trigger the error.
-- **`-k` selects by name:** a test not named after the pattern is silently skipped, which looks like "my test passes". Run a single test by full name (`file::test_name`) to be sure it ran. Test count is a quick check: 6 + 5 + 1 + placeholder = 13.
 
 ### Design decisions
 - `reviews` will be an append-only history (many rows per item, latest wins), not one overwritten row, so "approved on Monday, rejected on Friday" stays visible for pack provenance and the rejection-rate metric.
