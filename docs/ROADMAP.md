@@ -17,6 +17,10 @@ Backend and AI come first, for interview stories. The iOS spike is done early to
 - Alembic migrations.
 - FastAPI API with admin auth.
 - Integration tests against real Postgres.
+- Decided in the reviews task, enforce in the API step:
+  - `reviews` is append-only: the API's database role gets only SELECT and INSERT on `reviews` (no UPDATE/DELETE), so history and `decided_at` can't be rewritten.
+  - Items never change after creation: an edit creates a new item and the old one gets rejected. Same mechanism: no UPDATE on `items` for the API role.
+- Open question (revisit after real reviewing): switch `reviews.reason` from free text to fixed categories once rejection reasons repeat. Needs a migration that maps existing text to categories.
 
 ## Phase 2
 - Pipeline worker:

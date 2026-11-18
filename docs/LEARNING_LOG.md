@@ -136,3 +136,20 @@ After each task: concepts I met, and 1-2 interview Q&As that I write myself.
   A: A unique index on `lower(email)`. The API could lowercase emails before saving, but the database is the one place every writer goes through, so only an index guarantees it. The stored email keeps its casing for display.
 - Q: Why can `DEFAULT now()` and `NOT NULL` both be needed on `created_at`?
   A: The default fills a missing value; `NOT NULL` refuses an explicit `NULL`. My first test only covered the default case, so removing `NOT NULL` would not have turned anything red until I added a test that inserts `NULL`.
+
+## Phase 1: reviews
+
+### Concepts (drafted by Claude, reviewed by me)
+- **CHECK and NULL:** a CHECK rejects a row only when its condition is *false*; NULL (unknown) passes. So `CHECK (reason ~ '\S')` needs no `reason IS NULL OR ...`, and `CHECK (decision IN (...))` still needs a separate `NOT NULL`. [Docs](https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS)
+- **Proving *which* rule fired:** two CHECKs both raise `CheckViolation`, so tests also assert `excinfo.value.orig.diag.constraint_name`. Unnamed constraints get names from Postgres (`reviews_decision_check` for a one-column check, `reviews_check` for a check on two columns), so some tests passed by coincidence until every constraint was named.
+- **One broken rule per test row:** when a row breaks several CHECKs, Postgres reports the first one in alphabetical order by name. A row like `('pending', NULL)` broke two rules and passed only by alphabet luck.
+- **Green is not proof:** a weak test passes even when the migration is wrong. Examples: setup inside `pytest.raises` (the wrong statement can raise the expected error), "many reviews per item" tested with two different items, a row that breaks two rules. Ask: "if the migration were wrong in the way this test claims to catch, would it turn red?"
+- **Index = sorting done in advance:** Postgres indexes PRIMARY KEY and UNIQUE automatically, but **not** foreign keys. `CREATE INDEX ... ON reviews (item_id, decided_at DESC, id DESC)` serves "latest review for item X" and the RESTRICT check on item delete. `EXPLAIN` on 20,000 rows: without it `Seq Scan` + `Sort` (cost 398), with it `Index Scan` (cost 4.68). Indexes change speed, never results, so no behaviour test can see one. [Docs](https://www.postgresql.org/docs/current/indexes-intro.html)
+- **A UNIQUE index that includes `id`** never rejects anything (id is already unique), so a wrong `UNIQUE` there is invisible to tests but misleading to readers.
+- **Raw strings:** `r"""..."""` keeps `\S` for Postgres; without `r`, Python 3.12 warns about an invalid escape sequence.
+
+### Interview Q&A (drafted by Claude, reviewed by me)
+- Q: Your table has two CHECK constraints. How does your test prove the right one rejected the row?
+  A: The error class alone can't tell them apart, since both raise `CheckViolation`. I name every constraint and assert `diag.constraint_name`, and I make each test row break exactly one rule, because Postgres reports only the first failing CHECK in alphabetical order.
+- Q: Does Postgres index foreign keys? When would you add one yourself?
+  A: No, only primary keys and unique constraints get an automatic index. I add one when I query by the foreign key or delete parent rows: for reviews, "latest review per item" and the RESTRICT check on item delete. `EXPLAIN` showed a sequential scan plus sort turning into a single index scan, about 85 times cheaper on 20,000 rows.
