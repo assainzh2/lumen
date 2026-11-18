@@ -118,3 +118,23 @@ After each task: concepts I met, and 1-2 interview Q&As that I write myself.
 ### Interview Q&A (drafted by Claude, reviewed by me)
 - Q: Why did `items` need a composite foreign key instead of a plain one on `chunk_id`?
   A: Because `items` stores both `source_id` and `chunk_id`, and a plain key would accept a chunk that belongs to a different source, which breaks "every item carries a real source". The pair key makes that contradiction impossible in the database itself, and a test with two sources proves it.
+
+## Phase 1: admin_users
+
+### Concepts (drafted by Claude, reviewed by me)
+- **Why the table exists:** app users never log in; only dashboard/admin-API staff do. `reviews.reviewer_id` will point here, so every decision records who made it.
+- **Password hash:** a one-way scramble of the password. We store only the hash, so a leaked database does not contain real passwords. The hashing itself comes with the auth code in the API (full mentor loop then).
+- **Unique index on an expression:** `CREATE UNIQUE INDEX ... ON admin_users (lower(email))` compares the lowercased value, so `A@x.com` and `a@x.com` collide, while the stored `email` keeps its original casing. A plain `UNIQUE (email)` would be redundant next to it (everything it rejects, the index rejects too) and would double the index work on every write. [Docs](https://www.postgresql.org/docs/current/indexes-expressional.html)
+- **`DEFAULT` is not `NOT NULL`:** `DEFAULT now()` only fills the value when the column is left out; an explicit `NULL` is still accepted unless `NOT NULL` is there. Only a test that inserts `NULL` explicitly can see the difference.
+- **Test must fail for the right reason:** `(NULL, NULL)` for `(email, password_hash)` raises `NotNullViolation` from `email` alone, so it passed even without `NOT NULL` on `password_hash`. Keep every other column valid so only the column under test can trigger the error.
+- **`-k` selects by name:** a test not named after the pattern is silently skipped, which looks like "my test passes". Run a single test by full name (`file::test_name`) to be sure it ran. Test count is a quick check: 6 + 5 + 1 + placeholder = 13.
+
+### Design decisions
+- `reviews` will be an append-only history (many rows per item, latest wins), not one overwritten row, so "approved on Monday, rejected on Friday" stays visible for pack provenance and the rejection-rate metric.
+- `decision` will be a named `CHECK`, not an `ENUM` or a lookup table: the two values are program logic, and a `CHECK` is changed with one `ALTER`.
+
+### Interview Q&A (drafted by Claude, reviewed by me)
+- Q: How do you make email unique regardless of case, and why in the database?
+  A: A unique index on `lower(email)`. The API could lowercase emails before saving, but the database is the one place every writer goes through, so only an index guarantees it. The stored email keeps its casing for display.
+- Q: Why can `DEFAULT now()` and `NOT NULL` both be needed on `created_at`?
+  A: The default fills a missing value; `NOT NULL` refuses an explicit `NULL`. My first test only covered the default case, so removing `NOT NULL` would not have turned anything red until I added a test that inserts `NULL`.
