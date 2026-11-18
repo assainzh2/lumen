@@ -449,3 +449,22 @@ def test_admin_users_email_uniqueness_ignores_case(test_db_url: str) -> None:
     finally:
         engine.dispose()
     alembic(test_db_url, "downgrade", "base")
+
+
+
+def test_created_at_is_required(test_db_url: str) -> None:
+    """created_at is NOT NULL: a row without it is refused."""
+    alembic(test_db_url, "downgrade", "base")
+    alembic(test_db_url, "upgrade", "head")
+    engine = sa.create_engine(test_db_url)
+    try:
+        with pytest.raises(IntegrityError) as excinfo:
+            with engine.begin() as conn:
+                conn.execute(sa.text(
+                    "INSERT INTO admin_users (email, password_hash, created_at) "
+                    "VALUES ('a@example.com', 'x', NULL)"
+                ))
+        assert isinstance(excinfo.value.orig, psycopg.errors.NotNullViolation)
+    finally:
+        engine.dispose()
+    alembic(test_db_url, "downgrade", "base")
