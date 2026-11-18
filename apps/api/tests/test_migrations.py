@@ -334,3 +334,118 @@ def test_items_chunk_must_belong_to_same_source(test_db_url: str) -> None:
     finally:
         engine.dispose()
     alembic(test_db_url, "downgrade", "base")
+
+
+def insert_admin_user(conn: sa.Connection, email: str, password_hash: str = "x") -> int:
+    """Insert a minimal admin user and return its id."""
+    return conn.execute(
+        sa.text(
+            "INSERT INTO admin_users (email, password_hash) "
+            "VALUES (:email, :password_hash) "
+            "RETURNING id"
+        ),
+        {"email": email, "password_hash": password_hash},
+    ).scalar_one()
+
+
+def test_admin_users_insert_sets_created_at(test_db_url: str) -> None:
+    """A valid admin user is accepted and created_at is filled in by default."""
+    alembic(test_db_url, "downgrade", "base")
+    alembic(test_db_url, "upgrade", "head")
+    engine = sa.create_engine(test_db_url)
+    try:
+        with engine.begin() as conn:
+            admin_id = insert_admin_user(conn, "a@example.com")
+            created_at = conn.execute(
+                sa.text("SELECT created_at FROM admin_users WHERE id = :id"),
+                {"id": admin_id},
+            ).scalar_one()
+        assert created_at is not None
+    finally:
+        engine.dispose()
+    alembic(test_db_url, "downgrade", "base")
+
+
+def test_admin_users_email_is_unique(test_db_url: str) -> None:
+    """The same email cannot be registered twice."""
+    alembic(test_db_url, "downgrade", "base")
+    alembic(test_db_url, "upgrade", "head")
+    engine = sa.create_engine(test_db_url)
+    try:
+        with engine.begin() as conn:
+            insert_admin_user(conn, "a@example.com")
+
+        with pytest.raises(IntegrityError) as excinfo:
+            with engine.begin() as conn:
+                insert_admin_user(conn, "a@example.com", "other-hash")
+        assert isinstance(excinfo.value.orig, psycopg.errors.UniqueViolation)
+    finally:
+        engine.dispose()
+    alembic(test_db_url, "downgrade", "base")
+
+
+def test_admin_users_password_hash_is_not_unique(test_db_url: str) -> None:
+    """Two different admins may share a password_hash value.
+
+    Catches a wrong UNIQUE on password_hash instead of email.
+    """
+    alembic(test_db_url, "downgrade", "base")
+    alembic(test_db_url, "upgrade", "head")
+    engine = sa.create_engine(test_db_url)
+    try:
+        with engine.begin() as conn:
+            insert_admin_user(conn, "a@example.com", "same-hash")
+            insert_admin_user(conn, "b@example.com", "same-hash")
+            count = conn.execute(
+                sa.text("SELECT count(*) FROM admin_users WHERE password_hash = 'same-hash'")
+            ).scalar_one()
+        assert count == 2
+    finally:
+        engine.dispose()
+    alembic(test_db_url, "downgrade", "base")
+
+
+def test_admin_users_required_columns(test_db_url: str) -> None:
+    """email and password_hash are NOT NULL."""
+    alembic(test_db_url, "downgrade", "base")
+    alembic(test_db_url, "upgrade", "head")
+    engine = sa.create_engine(test_db_url)
+    try:
+        # NULL email is refused
+        with pytest.raises(IntegrityError) as excinfo:
+            with engine.begin() as conn:
+                conn.execute(sa.text(
+                    "INSERT INTO admin_users (email, password_hash) VALUES (NULL, 'x')"
+                ))
+        assert isinstance(excinfo.value.orig, psycopg.errors.NotNullViolation)
+
+        # NULL password_hash is refused
+        with pytest.raises(IntegrityError) as excinfo:
+            with engine.begin() as conn:
+                conn.execute(sa.text(
+                    "INSERT INTO admin_users (email, password_hash) VALUES ('a@example.com', NULL)"
+                ))
+        assert isinstance(excinfo.value.orig, psycopg.errors.NotNullViolation)
+    finally:
+        engine.dispose()
+    alembic(test_db_url, "downgrade", "base")
+
+
+def test_admin_users_email_uniqueness_ignores_case(test_db_url: str) -> None:
+    """a@example.com and A@example.com are the same admin.
+
+    Catches a plain UNIQUE (email), which treats them as different.
+    """
+    alembic(test_db_url, "downgrade", "base")
+    alembic(test_db_url, "upgrade", "head")
+    engine = sa.create_engine(test_db_url)
+    try:
+        with engine.begin() as conn:
+            insert_admin_user(conn, "a@example.com", "x")
+        with pytest.raises(IntegrityError) as excinfo:
+            with engine.begin() as conn:
+                insert_admin_user(conn, "A@example.com", "y")
+        assert isinstance(excinfo.value.orig, psycopg.errors.UniqueViolation)
+    finally:
+        engine.dispose()
+    alembic(test_db_url, "downgrade", "base")
