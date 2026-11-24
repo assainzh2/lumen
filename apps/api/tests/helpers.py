@@ -88,3 +88,25 @@ def insert_review(conn: sa.Connection, item_id: int, reviewer_id: int, decision:
         ),
         {"item_id": item_id, "reviewer_id": reviewer_id, "decision": decision, "reason": reason},
     ).scalar_one()
+
+
+def insert_pack(conn: sa.Connection, version: int | None) -> int:
+    """Insert a pack and return its id. version=None is allowed so tests can try NULL."""
+    return conn.execute(
+        sa.text(
+            "INSERT INTO packs (version) "
+            "VALUES (:version) RETURNING id"
+        ),
+        {"version": version},
+    ).scalar_one()
+
+
+def insert_pack_item(conn: sa.Connection, pack_id: int, item_id: int) -> None:
+    """Link an item to a pack (one pack_items row)."""
+    conn.execute(
+        sa.text(
+            "INSERT INTO pack_items (pack_id, item_id) "
+            "VALUES (:pack_id, :item_id)"
+        ),
+        {"pack_id": pack_id, "item_id": item_id},
+    )

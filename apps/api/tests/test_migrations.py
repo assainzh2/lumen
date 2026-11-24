@@ -13,3 +13,13 @@ def test_sources_and_kinds_upgrade_and_downgrade(test_db_url: str) -> None:
     alembic(test_db_url, "downgrade", "base")
     assert not table_exists(test_db_url, "sources")
     assert not table_exists(test_db_url, "kinds")
+
+
+def test_packs_and_pack_items_upgrade_and_downgrade(test_db_url: str) -> None:
+    alembic(test_db_url, "downgrade", "base")  # start from an empty database
+    alembic(test_db_url, "upgrade", "head")
+    assert table_exists(test_db_url, "packs")
+    assert table_exists(test_db_url, "pack_items")
+    alembic(test_db_url, "downgrade", "base")
+    assert not table_exists(test_db_url, "packs")
+    assert not table_exists(test_db_url, "pack_items")
